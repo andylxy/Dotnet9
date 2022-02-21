@@ -1,6 +1,6 @@
 # dotnet9.com
 
-一个使用abp vnext + blazor(C#)开发的博客网站
+这个分支放弃维护，使用abp vnext + blazor(C#)搭建，只做了网站前台展示，后台展示有点问题。
 
 ## 种子数据
 
