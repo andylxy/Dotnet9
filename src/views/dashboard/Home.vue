@@ -6,7 +6,7 @@
           <img src="./../../assets/post.png" class="left text_img" />
           <div class="left text_div">
             <p>文章总数</p>
-            <p>{{ model.systemCountInfo?.postCount }}篇</p>
+            <p>{{ basicData.postCount }}篇</p>
           </div>
         </div>
       </el-col>
@@ -15,7 +15,7 @@
           <img src="./../../assets/IP.png" class="left text_img" />
           <div class="left text_div">
             <p>24时IP访问</p>
-            <p>{{ model.systemCountInfo?.ipOf24Hours }}个</p>
+            <p>{{ basicData.ipOf24Hours }}个</p>
           </div>
         </div>
       </el-col>
@@ -24,7 +24,7 @@
           <img src="./../../assets/disk-read.png" class="left text_img" />
           <div class="left text_div">
             <p>磁盘读</p>
-            <p>{{ model.systemCountInfo?.diskRead }}</p>
+            <p>{{ basicData.diskRead }}</p>
           </div>
         </div>
       </el-col>
@@ -33,7 +33,7 @@
           <img src="./../../assets/disk-write.png" class="left text_img" />
           <div class="left text_div">
             <p>磁盘写</p>
-            <p>{{ model.systemCountInfo?.diskWrite }}</p>
+            <p>{{ basicData.diskWrite }}</p>
           </div>
         </div>
       </el-col>
@@ -41,13 +41,11 @@
         <div class="con_div_progress">
           <el-progress
             type="dashboard"
-            :percentage="model.systemCountInfo?.cpuLoad"
+            :percentage="basicData.cpuLoad"
             :color="colors"
           >
-            <template >
-              <span class="percentage-value"
-                >{{ model.systemCountInfo?.cpuLoad }}%</span
-              >
+            <template #default="{ percentage }">
+              <span class="percentage-value">{{ percentage }}%</span>
               <span class="percentage-label">CPU当前负载</span>
             </template>
           </el-progress>
@@ -57,13 +55,11 @@
         <div class="con_div_progress">
           <el-progress
             type="dashboard"
-            :percentage="model.systemCountInfo?.memoryUsage"
+            :percentage="basicData.memoryUsage"
             :color="colors"
           >
-            <template >
-              <span class="percentage-value"
-                >{{ model.systemCountInfo?.memoryUsage }}%</span
-              >
+            <template #default="{ percentage }">
+              <span class="percentage-value">{{ percentage }}%</span>
               <span class="percentage-label">内存使用率</span>
             </template>
           </el-progress>
@@ -76,7 +72,7 @@
         <template #header>
           <h2>Top10搜索词</h2>
         </template>
-        <el-table :data="model.top10Searches?.datas" >
+        <el-table height="600" :data="TopTenSearchTable">
           <el-table-column label="搜索词" prop="key" />
           <el-table-column label="浏览量(PV)" prop="pv" />
           <el-table-column label="占比" prop="percent" />
@@ -86,7 +82,7 @@
         <template #header>
           <h2>Top10受访页面</h2>
         </template>
-        <el-table :data="model.top10AccessPages?.datas">
+        <el-table height="600" :data="TopTenVisitTable">
           <el-table-column label="受访页面" prop="url" />
           <el-table-column label="浏览量(PV)" prop="pv" />
           <el-table-column label="占比" prop="percent" />
@@ -96,7 +92,7 @@
         <template #header>
           <h2>实时访问</h2>
         </template>
-        <el-table :data="model.latestLogs?.datas">
+        <el-table height="600" :data="LatestActionLogs">
           <el-table-column label="时间" prop="createDate" />
           <el-table-column label="访问地址" prop="url" />
           <el-table-column label="IP" prop="ip" />
@@ -109,12 +105,13 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, reactive } from "vue";
+import { ref, onMounted, reactive, onUnmounted } from "vue";
 
 import { get } from "shared/http/HttpClient";
 import { ElTable, ElTableColumn } from "element-plus";
 import { react } from "@babel/types";
 import { Timer } from "@element-plus/icons";
+import { fa } from "element-plus/lib/locale";
 
 const loading = ref(false);
 
@@ -134,10 +131,7 @@ const colors = [
   { color: "#6f7ad3", percentage: 20 },
 ];
 
-const model:any = ref({});
-
 let latestDate = ref("");
-const latestActionLogs = reactive([]);
 
 const url = ref("");
 
@@ -145,15 +139,60 @@ const close = (e: { base64: string }) => {
   url.value = e.base64;
 };
 
+let loadSwtch = ref<boolean>(false);
+
 onMounted(() => {
-  setInterval(loadDatas, 1000);
+  loadSwtch.value = true;
+  loadDatas();
 });
 
+onUnmounted(() => {
+  loadSwtch.value = false;
+});
+
+interface CheckFormData {
+  cpuLoad?: number;
+  diskRead?: string;
+  diskWrite?: string;
+  ipOf24Hours?: number;
+  memoryUsage?: number;
+  notFoundRequestIn24Hours?: number;
+  postCount?: number;
+}
+
+//基本信息参数
+const basicData: CheckFormData = reactive({});
+//top 搜索
+const TopTenSearchTable: any = reactive([]);
+//top 访问
+const TopTenVisitTable: any = reactive([]);
+//实时访问
+const LatestActionLogs: any = reactive([]);
+
 const loadDatas = () => {
-  get("/api/dashboard/count", { request: latestDate }).then((res: any) => {
-    model.value = res;
-    latestDate = res.latestLogs?.latestDate;
-    latestActionLogs.push(...res.latestLogs?.datas);
+  get("/api/dashboard/count", { request: "" }).then(async (res: any) => {
+    const { systemCountInfo, top10Searches, top10AccessPages, latestLogs } =
+      res;
+    Object.assign(basicData, { ...systemCountInfo });
+
+    if (top10Searches.datas.length) {
+      TopTenSearchTable.length = 0;
+      TopTenSearchTable.push(...top10Searches.datas);
+    }
+    if (top10AccessPages.datas.length) {
+      TopTenVisitTable.length = 0;
+      TopTenVisitTable.push(...top10AccessPages.datas);
+    }
+    if (latestLogs.datas.length) {
+      LatestActionLogs.length = 0;
+      LatestActionLogs.push(...latestLogs.datas);
+    }
+    
+    if (loadSwtch.value) {
+      setTimeout(() => {
+        loadDatas();
+      }, 1000);
+    }
   });
 };
 </script>
